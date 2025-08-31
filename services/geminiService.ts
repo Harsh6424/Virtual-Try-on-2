@@ -14,14 +14,14 @@ export async function generateTryOnImage(
     clothingItems: { top?: ImageData; trousers?: ImageData }
 ): Promise<string | null> {
 
-    if (!process.env.API_KEY) {
+    if (!process.env.REACT_APP_API_KEY) {
         // This should not be reached if the App component's guard is working,
         // but it's an important safeguard.
-        throw new Error("API_KEY environment variable is not set");
+        throw new Error("REACT_APP_API_KEY environment variable is not set");
     }
 
     if (!ai) {
-        ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        ai = new GoogleGenAI({ apiKey: process.env.REACT_APP_API_KEY });
     }
 
     const personImagePart = {

@@ -91,7 +91,7 @@ const App: React.FC = () => {
   const canGenerate = personImage && (topImage || trousersImage) && !isLoading;
 
   // Gracefully handle missing API key, common issue on deployment platforms like Vercel
-  if (!process.env.API_KEY) {
+  if (!process.env.REACT_APP_API_KEY) {
     return (
       <div className="min-h-screen bg-red-50 flex items-center justify-center p-4">
         <div className="max-w-2xl w-full bg-white rounded-2xl shadow-lg p-8 text-center border-2 border-red-200">
@@ -100,7 +100,7 @@ const App: React.FC = () => {
             The application is missing a required configuration.
           </p>
           <p className="mt-4 text-gray-600 bg-red-100 p-4 rounded-lg">
-            The <code>API_KEY</code> environment variable has not been set. Please make sure it is configured in your deployment environment (e.g., Vercel project settings) for the app to function.
+            The <code>REACT_APP_API_KEY</code> environment variable has not been set. Please make sure it is configured in your deployment environment (e.g., Vercel project settings) for the app to function.
           </p>
         </div>
       </div>
