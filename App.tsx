@@ -21,11 +21,30 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [canShare, setCanShare] = useState<boolean>(false);
 
+  const [apiKey, setApiKey] = useState<string>('');
+  const [isApiKeySet, setIsApiKeySet] = useState<boolean>(false);
+  const [apiKeyInput, setApiKeyInput] = useState<string>('');
+
   useEffect(() => {
     if (navigator.share) {
       setCanShare(true);
     }
+    const savedApiKey = sessionStorage.getItem('gemini-api-key');
+    if (savedApiKey) {
+      setApiKey(savedApiKey);
+      setIsApiKeySet(true);
+    }
   }, []);
+  
+  const handleApiKeySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (apiKeyInput.trim()) {
+      const trimmedKey = apiKeyInput.trim();
+      sessionStorage.setItem('gemini-api-key', trimmedKey);
+      setApiKey(trimmedKey);
+      setIsApiKeySet(true);
+    }
+  };
 
   const handleGenerate = useCallback(async () => {
     if (!personImage) {
@@ -34,6 +53,10 @@ const App: React.FC = () => {
     }
     if (!topImage && !trousersImage) {
       setError('Please upload at least one clothing item.');
+      return;
+    }
+    if (!apiKey) {
+      setError('API Key is not set. Please refresh and enter your API key.');
       return;
     }
 
@@ -46,19 +69,19 @@ const App: React.FC = () => {
         ...(topImage && { top: topImage }),
         ...(trousersImage && { trousers: trousersImage }),
       };
-      const result = await generateTryOnImage(personImage, clothingItems);
+      const result = await generateTryOnImage(personImage, clothingItems, apiKey);
       if(result) {
         setOutputImage(result);
       } else {
-        setError('The AI could not generate an image. Please try different images.');
+        setError('The AI could not generate an image. Please try different images or check your API key.');
       }
     } catch (e) {
       console.error(e);
-      setError('An error occurred while generating the image. Please try again.');
+      setError('An error occurred while generating the image. Please check the console for details.');
     } finally {
       setIsLoading(false);
     }
-  }, [personImage, topImage, trousersImage]);
+  }, [personImage, topImage, trousersImage, apiKey]);
   
   const handleShare = async () => {
     if (!outputImage || !navigator.share) {
@@ -90,18 +113,40 @@ const App: React.FC = () => {
 
   const canGenerate = personImage && (topImage || trousersImage) && !isLoading;
 
-  // Gracefully handle missing API key, common issue on deployment platforms like Vercel
-  if (!process.env.REACT_APP_API_KEY) {
+  if (!isApiKeySet) {
     return (
-      <div className="min-h-screen bg-red-50 flex items-center justify-center p-4">
-        <div className="max-w-2xl w-full bg-white rounded-2xl shadow-lg p-8 text-center border-2 border-red-200">
-          <h1 className="text-3xl font-bold text-red-600 mb-4">Configuration Error</h1>
-          <p className="text-gray-700 text-lg">
-            The application is missing a required configuration.
-          </p>
-          <p className="mt-4 text-gray-600 bg-red-100 p-4 rounded-lg">
-            The <code>REACT_APP_API_KEY</code> environment variable has not been set. Please make sure it is configured in your deployment environment (e.g., Vercel project settings) for the app to function.
-          </p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">Welcome to Virtual Try-On AI</h1>
+            <p className="text-gray-600 mb-6">Please enter your Google Gemini API key to begin.</p>
+          </div>
+          <form onSubmit={handleApiKeySubmit}>
+            <div className="mb-4">
+              <label htmlFor="apiKey" className="block text-sm font-medium text-gray-700 sr-only">
+                Gemini API Key
+              </label>
+              <input
+                id="apiKey"
+                type="password"
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                className="block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Enter your Gemini API key"
+                required
+                aria-label="Gemini API Key Input"
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-full shadow-sm text-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
+              Continue
+            </button>
+          </form>
+           <p className="mt-6 text-xs text-gray-500 text-center">
+             Your API key is stored only in your browser's session storage and is not sent to any servers.
+           </p>
         </div>
       </div>
     );

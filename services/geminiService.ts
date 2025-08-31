@@ -4,25 +4,17 @@ import type { ImageData } from '../types';
 
 const MODEL_NAME = 'gemini-2.5-flash-image-preview';
 
-// We will initialize this lazily inside the function to avoid a crash
-// on module load if the API key is not set. The App component will
-// handle showing an error message to the user.
-let ai: GoogleGenAI | null = null;
-
 export async function generateTryOnImage(
     personImage: ImageData, 
-    clothingItems: { top?: ImageData; trousers?: ImageData }
+    clothingItems: { top?: ImageData; trousers?: ImageData },
+    apiKey: string
 ): Promise<string | null> {
 
-    if (!process.env.REACT_APP_API_KEY) {
-        // This should not be reached if the App component's guard is working,
-        // but it's an important safeguard.
-        throw new Error("REACT_APP_API_KEY environment variable is not set");
+    if (!apiKey) {
+        throw new Error("Gemini API key is missing.");
     }
 
-    if (!ai) {
-        ai = new GoogleGenAI({ apiKey: process.env.REACT_APP_API_KEY });
-    }
+    const ai = new GoogleGenAI({ apiKey });
 
     const personImagePart = {
         inlineData: {
