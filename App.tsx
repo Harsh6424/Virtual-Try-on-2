@@ -1,15 +1,27 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
+import { UrlImageFetcher } from './components/UrlImageFetcher';
 import { Spinner } from './components/Spinner';
 import { generateTryOnImage } from './services/geminiService';
 import type { ImageData } from './types';
 
 const ShareIcon = () => (
-    <svg className="-ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-        <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+        <polyline points="16 6 12 2 8 6"></polyline>
+        <line x1="12" y1="2" x2="12" y2="15"></line>
     </svg>
 );
+
+const DownloadIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+      <polyline points="7 10 12 15 17 10"></polyline>
+      <line x1="12" y1="15" x2="12" y2="3"></line>
+    </svg>
+);
+
 
 const App: React.FC = () => {
   const [personImage, setPersonImage] = useState<ImageData | null>(null);
@@ -20,30 +32,11 @@ const App: React.FC = () => {
   const [error, setError] = useState<React.ReactNode | null>(null);
   const [canShare, setCanShare] = useState<boolean>(false);
 
-  const [apiKey, setApiKey] = useState<string>('');
-  const [isApiKeySet, setIsApiKeySet] = useState<boolean>(false);
-  const [apiKeyInput, setApiKeyInput] = useState<string>('');
-
   useEffect(() => {
     if (navigator.share) {
       setCanShare(true);
     }
-    const savedApiKey = sessionStorage.getItem('gemini-api-key');
-    if (savedApiKey) {
-      setApiKey(savedApiKey);
-      setIsApiKeySet(true);
-    }
   }, []);
-  
-  const handleApiKeySubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (apiKeyInput.trim()) {
-      const trimmedKey = apiKeyInput.trim();
-      sessionStorage.setItem('gemini-api-key', trimmedKey);
-      setApiKey(trimmedKey);
-      setIsApiKeySet(true);
-    }
-  };
 
   const handleGenerate = useCallback(async () => {
     if (!personImage) {
@@ -52,10 +45,6 @@ const App: React.FC = () => {
     }
     if (!topImage && !trousersImage) {
       setError('Please upload at least one clothing item.');
-      return;
-    }
-    if (!apiKey) {
-      setError('API Key is not set. Please refresh and enter your API key.');
       return;
     }
 
@@ -68,22 +57,22 @@ const App: React.FC = () => {
         ...(topImage && { top: topImage }),
         ...(trousersImage && { trousers: trousersImage }),
       };
-      const result = await generateTryOnImage(personImage, clothingItems, apiKey);
+      const result = await generateTryOnImage(personImage, clothingItems);
       if(result) {
         setOutputImage(result);
       } else {
-        setError('The AI could not generate an image. Please try different images or check your API key.');
+        setError('The AI could not generate an image. Please try different images.');
       }
     } catch (e) {
       console.error(e);
       if (e instanceof Error && e.message === 'RATE_LIMIT_EXCEEDED') {
         setError(
             <>
-                You've exceeded the free request limit. Please wait a minute and try again.
+                You've hit the request limit. Please chill for a minute and try again.
                 <br />
-                For higher limits, please{' '}
-                <a href="https://ai.google.dev/pricing" target="_blank" rel="noopener noreferrer" className="underline text-indigo-600 hover:text-indigo-800">
-                    check your plan and billing details
+                For higher limits,{' '}
+                <a href="https://ai.google.dev/pricing" target="_blank" rel="noopener noreferrer" className="underline text-cyan-400 hover:text-cyan-300">
+                    check your plan & billing details
                 </a>.
             </>
         );
@@ -93,8 +82,8 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [personImage, topImage, trousersImage, apiKey]);
-  
+  }, [personImage, topImage, trousersImage]);
+
   const handleShare = async () => {
     if (!outputImage || !navigator.share) {
       alert("Sharing is not supported on this browser or there is no image to share.");
@@ -102,9 +91,11 @@ const App: React.FC = () => {
     }
 
     try {
+      const fileName = 'virtual-try-on.png';
+      
       const response = await fetch(outputImage);
       const blob = await response.blob();
-      const file = new File([blob], 'virtual-try-on.png', { type: blob.type });
+      const file = new File([blob], fileName, { type: blob.type });
 
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
@@ -125,101 +116,75 @@ const App: React.FC = () => {
 
   const canGenerate = personImage && (topImage || trousersImage) && !isLoading;
 
-  if (!isApiKeySet) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-lg p-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">Welcome to Virtual Try-On AI</h1>
-            <p className="text-gray-600 mb-6">Please enter your Google Gemini API key to begin.</p>
-          </div>
-          <form onSubmit={handleApiKeySubmit}>
-            <div className="mb-4">
-              <label htmlFor="apiKey" className="block text-sm font-medium text-gray-700 sr-only">
-                Gemini API Key
-              </label>
-              <input
-                id="apiKey"
-                type="password"
-                value={apiKeyInput}
-                onChange={(e) => setApiKeyInput(e.target.value)}
-                className="block w-full px-4 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                placeholder="Enter your Gemini API key"
-                required
-                aria-label="Gemini API Key Input"
-              />
-            </div>
-            <button
-              type="submit"
-              className="w-full flex justify-center py-3 px-4 border border-transparent rounded-full shadow-sm text-lg font-semibold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              Continue
-            </button>
-          </form>
-           <p className="mt-6 text-xs text-gray-500 text-center">
-             Your API key is stored only in your browser's session storage and is not sent to any servers.
-           </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-gray-900 flex flex-col font-sans">
       <Header />
-      <main className="flex-grow container mx-auto p-4 md:p-8">
-        <div className="max-w-5xl mx-auto bg-white rounded-2xl shadow-lg p-6 md:p-10">
-          <p className="text-center text-gray-600 mb-8 max-w-2xl mx-auto">
-            Welcome to the Virtual Try-On experience. Upload a full-body photo of a person and clear images of garments to see the magic happen.
-          </p>
+      <main className="flex-grow container mx-auto p-4 sm:p-6 lg:p-8">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-8 lg:mb-12">
+            <h2 className="text-4xl lg:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 via-purple-500 to-cyan-400">
+              AI Virtual Try-On
+            </h2>
+            <p className="mt-3 max-w-2xl mx-auto text-lg text-gray-400">
+              Style your avatar. Upload a photo and clothes to generate a fresh look in seconds.
+            </p>
+          </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-            <ImageUploader title="Upload Person" onImageUpload={setPersonImage} />
-            <ImageUploader title="Upload Top" onImageUpload={setTopImage} />
-            <ImageUploader title="Upload Trousers" onImageUpload={setTrousersImage} />
+          <div className="bg-gray-800/50 rounded-3xl shadow-2xl p-4 sm:p-6 lg:p-8 border border-gray-700 backdrop-blur-sm">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+              <div className="w-full">
+                  <h3 className="text-xl font-bold text-center text-gray-200 mb-4">1. The Person</h3>
+                  <ImageUploader value={personImage} onImageUpload={setPersonImage} />
+              </div>
+              <UrlImageFetcher title="2. The Top" value={topImage} onImageUpload={setTopImage} />
+              <UrlImageFetcher title="3. The Trousers" value={trousersImage} onImageUpload={setTrousersImage} />
+            </div>
           </div>
 
-          <div className="text-center mb-8">
+          <div className="mt-8 text-center">
             <button
               onClick={handleGenerate}
               disabled={!canGenerate}
-              className={`px-8 py-3 text-lg font-semibold text-white rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 ${
-                canGenerate ? 'bg-indigo-600 hover:bg-indigo-700 shadow-md hover:shadow-lg transform hover:-translate-y-1' : 'bg-gray-400 cursor-not-allowed'
+              className={`px-10 py-4 text-lg font-bold text-white rounded-full transition-all duration-300 ease-in-out focus:outline-none focus:ring-4 focus:ring-purple-400 transform hover:scale-105 ${
+                canGenerate ? 'bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 glow-on-hover' : 'bg-gray-600 cursor-not-allowed opacity-70'
               }`}
+              aria-label={isLoading ? "Generating your virtual try-on" : "Generate virtual try-on"}
             >
-              {isLoading ? 'Generating...' : 'Virtual Try-On'}
+              {isLoading ? 'Generating...' : '✨ Generate Fit'}
             </button>
           </div>
           
           {(isLoading || error || outputImage) && (
-             <div className="mt-10 border-t-2 border-gray-200 pt-8">
-                <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">Result</h2>
-                 <div className="w-full max-w-lg mx-auto p-4 bg-gray-100 rounded-xl min-h-[300px] flex flex-col items-center justify-center">
+             <div className="mt-10">
+                <div className="w-full max-w-2xl mx-auto bg-gray-800/50 rounded-3xl shadow-2xl p-4 sm:p-6 min-h-[300px] flex flex-col items-center justify-center border border-gray-700">
                    {isLoading && <Spinner />}
-                   {error && <div className="text-red-500 text-center font-medium p-4">{error}</div>}
+                   {error && (
+                    <div className="text-center text-red-400 font-medium p-4 bg-red-900/50 rounded-2xl border border-red-500/50">
+                      <h3 className="font-bold text-lg mb-2">Something Went Wrong</h3>
+                      <p className="text-sm">{error}</p>
+                    </div>
+                   )}
                    {outputImage && (
-                     <>
+                     <div className="w-full">
                         <img 
                           src={outputImage} 
                           alt="Generated virtual try-on"
-                          className="rounded-lg shadow-xl object-contain max-h-[600px] w-full" 
+                          className="rounded-2xl shadow-lg object-contain max-h-[70vh] w-full" 
                         />
-                        <div className="text-center mt-6 flex flex-wrap justify-center gap-4">
+                        <div className="text-center mt-6 flex flex-col sm:flex-row items-center justify-center gap-4">
                             <a
                                 href={outputImage}
                                 download="virtual-try-on.png"
-                                className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-full shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
+                                className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-full shadow-sm text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-indigo-500 transition-all"
                                 aria-label="Download generated image"
                             >
-                                <svg className="-ml-1 mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                                </svg>
+                                <DownloadIcon />
                                 Download
                             </a>
                             {canShare && (
                                 <button
                                     onClick={handleShare}
-                                    className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-full shadow-sm text-white bg-green-500 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all"
+                                    className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 border border-gray-600 text-base font-medium rounded-full shadow-sm text-gray-200 bg-gray-700/50 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-cyan-500 transition-all"
                                     aria-label="Share generated image"
                                 >
                                     <ShareIcon />
@@ -227,7 +192,7 @@ const App: React.FC = () => {
                                 </button>
                             )}
                         </div>
-                     </>
+                     </div>
                    )}
                  </div>
              </div>
@@ -235,8 +200,8 @@ const App: React.FC = () => {
 
         </div>
       </main>
-       <footer className="text-center p-4 text-gray-500 text-sm">
-        <p>Powered by Gemini AI</p>
+       <footer className="text-center p-6 text-gray-500 text-sm">
+        <p>Powered by Google's Gemini AI</p>
       </footer>
     </div>
   );
