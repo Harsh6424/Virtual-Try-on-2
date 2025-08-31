@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Modality } from "@google/genai";
 import type { ImageData } from '../types';
 
@@ -82,8 +81,12 @@ export async function generateTryOnImage(
         // If no image part is found, return null
         return null;
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error calling Gemini API:", error);
+        // Check if the error is a rate limit error (status 429)
+        if (error.toString().includes('"code":429')) {
+             throw new Error("RATE_LIMIT_EXCEEDED");
+        }
         throw new Error("Failed to generate image from Gemini API.");
     }
 }

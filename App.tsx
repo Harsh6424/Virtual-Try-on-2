@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
@@ -18,7 +17,7 @@ const App: React.FC = () => {
   const [trousersImage, setTrousersImage] = useState<ImageData | null>(null);
   const [outputImage, setOutputImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<React.ReactNode | null>(null);
   const [canShare, setCanShare] = useState<boolean>(false);
 
   const [apiKey, setApiKey] = useState<string>('');
@@ -77,7 +76,20 @@ const App: React.FC = () => {
       }
     } catch (e) {
       console.error(e);
-      setError('An error occurred while generating the image. Please check the console for details.');
+      if (e instanceof Error && e.message === 'RATE_LIMIT_EXCEEDED') {
+        setError(
+            <>
+                You've exceeded the free request limit. Please wait a minute and try again.
+                <br />
+                For higher limits, please{' '}
+                <a href="https://ai.google.dev/pricing" target="_blank" rel="noopener noreferrer" className="underline text-indigo-600 hover:text-indigo-800">
+                    check your plan and billing details
+                </a>.
+            </>
+        );
+      } else {
+        setError('An error occurred while generating the image. Please check the console for details.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -184,7 +196,7 @@ const App: React.FC = () => {
                 <h2 className="text-2xl font-bold text-center text-gray-800 mb-6">Result</h2>
                  <div className="w-full max-w-lg mx-auto p-4 bg-gray-100 rounded-xl min-h-[300px] flex flex-col items-center justify-center">
                    {isLoading && <Spinner />}
-                   {error && <p className="text-red-500 text-center font-medium">{error}</p>}
+                   {error && <div className="text-red-500 text-center font-medium p-4">{error}</div>}
                    {outputImage && (
                      <>
                         <img 
