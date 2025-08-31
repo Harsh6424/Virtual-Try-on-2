@@ -4,16 +4,26 @@ import type { ImageData } from '../types';
 
 const MODEL_NAME = 'gemini-2.5-flash-image-preview';
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable is not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// We will initialize this lazily inside the function to avoid a crash
+// on module load if the API key is not set. The App component will
+// handle showing an error message to the user.
+let ai: GoogleGenAI | null = null;
 
 export async function generateTryOnImage(
     personImage: ImageData, 
     clothingItems: { top?: ImageData; trousers?: ImageData }
 ): Promise<string | null> {
+
+    if (!process.env.API_KEY) {
+        // This should not be reached if the App component's guard is working,
+        // but it's an important safeguard.
+        throw new Error("API_KEY environment variable is not set");
+    }
+
+    if (!ai) {
+        ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    }
+
     const personImagePart = {
         inlineData: {
             data: personImage.base64,
