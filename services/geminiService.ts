@@ -1,19 +1,21 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 import type { ImageData } from '../types';
 
-if (!process.env.API_KEY) {
-    throw new Error("API_KEY environment variable not set.");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const IMAGE_EDIT_MODEL = 'gemini-2.5-flash-image-preview';
 
-
 export async function generateTryOnImage(
+    apiKey: string,
     personImage: ImageData, 
     clothingItems: { top?: ImageData; trousers?: ImageData }
 ): Promise<string | null> {
-     const personImagePart = {
+    
+    if (!apiKey) {
+        throw new Error("INVALID_API_KEY");
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    const personImagePart = {
         inlineData: {
             data: personImage.base64,
             mimeType: personImage.mimeType,
@@ -72,7 +74,11 @@ Your objective is to edit the first image (the person) to make them wear the pro
 
     } catch (error: any) {
         console.error("Error calling Gemini API for image generation:", error);
-        if (error.toString().includes('"code":429')) {
+        const errorMessage = error.toString();
+        if (errorMessage.includes('API key not valid')) {
+            throw new Error("INVALID_API_KEY");
+        }
+        if (errorMessage.includes('"code":429') || errorMessage.includes('RESOURCE_EXHAUSTED')) {
              throw new Error("RATE_LIMIT_EXCEEDED");
         }
         throw new Error("Failed to generate image from Gemini API.");

@@ -3,6 +3,7 @@ import { Header } from './components/Header';
 import { ImageUploader } from './components/ImageUploader';
 import { UrlImageFetcher } from './components/UrlImageFetcher';
 import { Spinner } from './components/Spinner';
+import { ApiKeyModal } from './components/ApiKeyModal';
 import { generateTryOnImage } from './services/geminiService';
 import type { ImageData } from './types';
 
@@ -31,14 +32,35 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<React.ReactNode | null>(null);
   const [canShare, setCanShare] = useState<boolean>(false);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (navigator.share) {
       setCanShare(true);
     }
+    const storedKey = localStorage.getItem('gemini-api-key');
+    if (storedKey) {
+        setApiKey(storedKey);
+    } else {
+        setIsApiKeyModalOpen(true);
+    }
   }, []);
 
+  const handleSaveApiKey = (key: string) => {
+    if (key.trim()) {
+        setApiKey(key);
+        localStorage.setItem('gemini-api-key', key);
+        setIsApiKeyModalOpen(false);
+    }
+  };
+
   const handleGenerate = useCallback(async () => {
+    if (!apiKey) {
+      setError('Please set your Google AI API key to continue.');
+      setIsApiKeyModalOpen(true);
+      return;
+    }
     if (!personImage) {
       setError('Please upload a photo of a person.');
       return;
@@ -57,7 +79,7 @@ const App: React.FC = () => {
         ...(topImage && { top: topImage }),
         ...(trousersImage && { trousers: trousersImage }),
       };
-      const result = await generateTryOnImage(personImage, clothingItems);
+      const result = await generateTryOnImage(apiKey, personImage, clothingItems);
       if(result) {
         setOutputImage(result);
       } else {
@@ -65,24 +87,33 @@ const App: React.FC = () => {
       }
     } catch (e) {
       console.error(e);
-      if (e instanceof Error && e.message === 'RATE_LIMIT_EXCEEDED') {
-        setError(
-            <>
-                You've hit the request limit. Please chill for a minute and try again.
-                <br />
-                For higher limits,{' '}
-                <a href="https://ai.google.dev/pricing" target="_blank" rel="noopener noreferrer" className="underline text-cyan-400 hover:text-cyan-300">
-                    check your plan & billing details
-                </a>.
-            </>
-        );
+      if (e instanceof Error) {
+        if (e.message === 'RATE_LIMIT_EXCEEDED') {
+            setError(
+                <>
+                    You've hit the request limit. Please chill for a minute and try again.
+                    <br />
+                    For higher limits,{' '}
+                    <a href="https://ai.google.dev/pricing" target="_blank" rel="noopener noreferrer" className="underline text-cyan-400 hover:text-cyan-300">
+                        check your plan & billing details
+                    </a>.
+                </>
+            );
+        } else if (e.message === 'INVALID_API_KEY') {
+            setError(<>Your API Key is invalid. Please enter a valid key. <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="underline text-cyan-400 hover:text-cyan-300">Get a new key here.</a></>);
+            localStorage.removeItem('gemini-api-key');
+            setApiKey(null);
+            setIsApiKeyModalOpen(true);
+        } else {
+             setError('An error occurred while generating the image. Please check the console for details.');
+        }
       } else {
-        setError('An error occurred while generating the image. Please check the console for details.');
+         setError('An unexpected error occurred.');
       }
     } finally {
       setIsLoading(false);
     }
-  }, [personImage, topImage, trousersImage]);
+  }, [apiKey, personImage, topImage, trousersImage]);
 
   const handleShare = async () => {
     if (!outputImage || !navigator.share) {
@@ -119,6 +150,10 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-900 flex flex-col font-sans">
       <Header />
+      <ApiKeyModal 
+        isOpen={isApiKeyModalOpen}
+        onSave={handleSaveApiKey}
+      />
       <main className="flex-grow container mx-auto p-4 sm:p-6 lg:p-8">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-8 lg:mb-12">
@@ -202,6 +237,9 @@ const App: React.FC = () => {
       </main>
        <footer className="text-center p-6 text-gray-500 text-sm">
         <p>Powered by Google's Gemini AI</p>
+        <button onClick={() => setIsApiKeyModalOpen(true)} className="mt-2 text-cyan-400 hover:text-cyan-300 underline text-xs">
+          Edit API Key
+        </button>
       </footer>
     </div>
   );
